@@ -118,41 +118,43 @@ def calculate_poincare_at_given_energy(system:PerturbedSystem, j1s, E, max_time=
     for j1 in j1s:
         poincare.append(calculate_poincare_at_given_energy_single_J1(system, j1, E, max_time=max_time))
     return np.vstack(poincare)
+
+
+if __name__ == "__main__":
     
+    unperburbed_system = UnperturbedSystem(a=3.4)
 
-unperburbed_system = UnperturbedSystem(a=3.4)
+    E = 1.59
 
-E = 1.59
+    j1 = np.linspace(0.1, 0.8, 100)
+    epsilon = 1e-2
 
-j1 = np.linspace(0.1, 0.8, 100)
-epsilon = 1e-2
+    perburations = [Perturbation(epsilon=epsilon, n1=1, m2=-4), Perturbation(epsilon=epsilon, n1=1, m2=-5), Perturbation(epsilon=epsilon, n1=1, m2=-6)]
 
-perburations = [Perturbation(epsilon=epsilon, n1=1, m2=-4), Perturbation(epsilon=epsilon, n1=1, m2=-5), Perturbation(epsilon=epsilon, n1=1, m2=-6)]
-
-system = PerturbedSystem(unperburbed_system, perburations)
-
+    system = PerturbedSystem(unperburbed_system, perburations)
 
 
-fig, ax = plt.subplots()
-ax.plot(j1, unperburbed_system.kinetic_q_at_constant_energy(j1, E))
-ax.set_xlabel('J1')
-ax.set_ylabel('q')
-ax.set_title(f'Kinetic q at E = {E}, alpha = {system.unperturbed_system.a}')
-ax.set_ylim(0, 8)
-ax.axhline(4, color='black', lw=0.5)
-ax.axhline(5, color='black', lw=0.5)
-ax.axhline(6, color='black', lw=0.5)
 
-j1_init = [ 0.25, 0.3, 
-           0.4,
-           0.5, 
-           0.6,
-           ]
-poincare = calculate_poincare_at_given_energy(system, j1_init, E, max_time=10000)
-fig, ax = plt.subplots()
-J1_cross = poincare[:, 0]
-theta2_cross = poincare[:, 3]
+    fig, ax = plt.subplots()
+    ax.plot(j1, unperburbed_system.kinetic_q_at_constant_energy(j1, E))
+    ax.set_xlabel('J1')
+    ax.set_ylabel('q')
+    ax.set_title(f'Kinetic q at E = {E}, alpha = {system.unperturbed_system.a}')
+    ax.set_ylim(0, 8)
+    ax.axhline(4, color='black', lw=0.5)
+    ax.axhline(5, color='black', lw=0.5)
+    ax.axhline(6, color='black', lw=0.5)
 
-ax.plot(wrap_minus_pi_pi(theta2_cross), J1_cross, ',k', alpha=0.8)
+    j1_init = [ 0.25, 0.3, 
+               0.4,
+               0.5, 
+               0.6,
+               ]
+    poincare = calculate_poincare_at_given_energy(system, j1_init, E, max_time=10000)
+    fig, ax = plt.subplots()
+    J1_cross = poincare[:, 0]
+    theta2_cross = poincare[:, 3]
 
-plt.show()
+    ax.plot(wrap_minus_pi_pi(theta2_cross), J1_cross, ',k', alpha=0.8)
+
+    plt.show()
