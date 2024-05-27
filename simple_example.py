@@ -24,6 +24,8 @@ class UnperturbedSystem:
     def J2_at_constant_energy(self, J1, E):
         return np.sqrt((E - self.a * J1**2) / J1)
 
+    def maximal_J1(self, E):
+        return np.sqrt(E / self.a)
 
     def kinetic_q(self, J1, J2):
         return self.omega1(J1, J2)/ self.omega2(J1, J2)
