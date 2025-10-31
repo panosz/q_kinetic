@@ -1,0 +1,19 @@
+[build-system]
+requires = ["scikit-build-core>=0.3.3", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "q_kinetic_minimum"
+version = "0.0.1"
+authors = [{name = "Panagiotis Zestanakis"}]
+description = "Examples of dynamics with local minimum in q_kinetic"  # Add your package description here
+
+# Define any package dependencies here
+dependencies = [
+    # "dependency1",
+    # "dependency2",
+]
+
+[tool.scikit-build]
+build-dir = "build/{wheel_tag}"
+
