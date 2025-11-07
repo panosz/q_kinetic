@@ -1,7 +1,6 @@
-from math import sqrt
-
 import matplotlib.pyplot as plt
 import numpy as np
+from numba import njit
 from scipy.integrate import solve_ivp
 
 
@@ -18,10 +17,10 @@ class UnperturbedSystem:
         return self.a * J1**2 + J2**2 * J1
 
     def omega1(self, J1, J2):
-        return 2 * self.a * J1 + J2**2
+        return omega1(self.a, J1, J2)
 
     def omega2(self, J1, J2):
-        return 2 * J2 * J1
+        return omega2(J1, J2)
 
     def J2_at_constant_energy(self, J1, E):
         return np.sqrt((E - self.a * J1**2) / J1)
@@ -40,26 +39,23 @@ class UnperturbedSystem:
         """
         returns the time derivative of the state vector (J1, J2, theta1, theta2)
         """
-        J1, J2, theta1, theta2 = y
-        return np.array([0, 0, self.omega1(J1, J2), self.omega2(J1, J2)])
+        return unperturbed_dydt(t, y, self.a)
 
-    def d2H_J1(self, J1, J2):
-        return 2 * self.a
 
-    def d2H_J2(self, J1, J2):
-        return 2 * J1
+@njit
+def omega1(a, J1, J2):
+    return 2 * a * J1 + J2**2
 
-    def d2H_J1_J2(self, J1, J2):
-        return 2 * J2
 
-    def J1_critical(self, E):
-        """returns the critical J1, where kinetic_q has a minimum"""
-        k = sqrt(2 * sqrt(3) - 3)
-        return k * sqrt(E / self.a)
+@njit
+def omega2(J1, J2):
+    return 2 * J2 * J1
 
-    def kinetic_q_minimum(self, E):
-        """returns the minimum of kinetic_q at given energy E"""
-        return self.kinetic_q(self.J1_critical(E), self.J2_at_constant_energy(self.J1_critical(E), E))
+
+@njit
+def unperturbed_dydt(t: float, y: np.ndarray, a: float):
+    J1, J2, theta1, theta2 = y
+    return np.array([0, 0, omega1(a, J1, J2), omega2(J1, J2)])
 
 
 class Perturbation:
@@ -75,10 +71,15 @@ class Perturbation:
         """
         returns the time derivative of the state vector (J1, J2, theta1, theta2)
         """
-        J1, J2, theta1, theta2 = y
-        phase = self.n1 * theta1 + self.m2 * theta2
-        cos = np.cos(phase)
-        return self.epsilon * np.array([-self.n1 * cos, -self.m2 * cos, 0, 0])
+        return perturbed_dydt(t, y, self.epsilon, self.n1, self.m2)
+
+
+@njit
+def perturbed_dydt(t: float, y: np.ndarray, epsilon: float, n1: int, m2: int):
+    J1, J2, theta1, theta2 = y
+    phase = n1 * theta1 + m2 * theta2
+    cos = np.cos(phase)
+    return epsilon * np.array([-n1 * cos, -m2 * cos, 0, 0])
 
 
 class PerturbedSystem:
@@ -123,6 +124,11 @@ class Theta1CrossEvent:
         return np.sin(theta1)
 
 
+@njit
+def theta1_cross_event(t, y, *_):
+    theta1 = y[2]
+    return np.sin(theta1)
+
 def is_close_to_zero(theta):
     return np.abs(theta) < 1e-3
 
@@ -130,11 +136,19 @@ def is_close_to_zero(theta):
 def poincare_section(
     system: PerturbedSystem, initial_conditions: np.ndarray, max_time=1000
 ):
+
+    a = system.unperturbed_system.a
+    epsilons = np.array([p.epsilon for p in system.perturbations])
+    n1s = np.array([p.n1 for p in system.perturbations])
+    m2s = np.array([p.m2 for p in system.perturbations])
+
+
     sol = solve_ivp(
-        system.dydt,
+        dydt_system,
         (0, max_time),
         initial_conditions,
-        events=Theta1CrossEvent(),
+        events=theta1_cross_event,
+        args=(a, epsilons, n1s, m2s),
         rtol=1e-8,
         atol=1e-8,
     )
@@ -151,7 +165,7 @@ def calculate_poincare_at_given_energy_single_J1(
     system: PerturbedSystem, j1_init, E, max_time=1000
 ):
     initial_conditions = np.array(
-        [j1_init, unperturbed_system.J2_at_constant_energy(j1_init, E), 0, 0]
+        [j1_init, unperburbed_system.J2_at_constant_energy(j1_init, E), 0, 0]
     )
 
     return poincare_section(system, initial_conditions, max_time=max_time)
@@ -168,33 +182,51 @@ def calculate_poincare_at_given_energy(system: PerturbedSystem, j1s, E, max_time
     return np.vstack(poincare)
 
 
+@njit
+def dydt_system(
+    t: float,
+    y: np.ndarray,
+    a: float,
+    epsilons: np.ndarray,
+    n1s: np.ndarray,
+    m2s: np.ndarray,
+):
+    dydt_unperturbed = unperturbed_dydt(t, y, a)
+    dydt_perturbations = np.zeros(4)
+    for epsilon, n1, m2 in zip(epsilons, n1s, m2s):
+        dydt_perturbations += perturbed_dydt(t, y, epsilon, n1, m2)
+    return dydt_unperturbed + dydt_perturbations
+
+
 if __name__ == "__main__":
 
-    unperturbed_system = UnperturbedSystem(a=3.4)
+    unperburbed_system = UnperturbedSystem(a=3.4)
 
     E = 1.59
+
+    j1 = np.linspace(0.1, 0.8, 100)
     epsilon = 1e-2
 
-    j1 = np.linspace(0.1, 0.9999 * unperturbed_system.maximal_J1(E), 100)
+    epsilon_array = np.full(3, epsilon)
+    n1_array = np.full(3, 1)
+    m2_array = np.array([-4, -5, -6])
+
+    perburations = [
+        Perturbation(epsilon=epsilon_i, n1=n1_i, m2=m2_array)
+        for epsilon_i, n1_i, m2_array in zip(epsilon_array, n1_array, m2_array)
+    ]
+
+    system = PerturbedSystem(unperburbed_system, perburations)
 
     fig, ax = plt.subplots()
-    ax.plot(j1, unperturbed_system.kinetic_q_at_constant_energy(j1, E))
+    ax.plot(j1, unperburbed_system.kinetic_q_at_constant_energy(j1, E))
     ax.set_xlabel("J1")
     ax.set_ylabel("q")
-    ax.set_title(f"Kinetic q at E = {E}, alpha = {unperturbed_system.a}")
+    ax.set_title(f"Kinetic q at E = {E}, alpha = {system.unperturbed_system.a}")
     ax.set_ylim(0, 8)
     ax.axhline(4, color="black", lw=0.5)
     ax.axhline(5, color="black", lw=0.5)
     ax.axhline(6, color="black", lw=0.5)
-    ax.plot(unperturbed_system.J1_critical(E), unperturbed_system.kinetic_q_minimum(E), "ro")
-
-    perburations = [
-        Perturbation(epsilon=epsilon, n1=1, m2=-4),
-        Perturbation(epsilon=epsilon, n1=1, m2=-5),
-        Perturbation(epsilon=epsilon, n1=1, m2=-6),
-    ]
-
-    system = PerturbedSystem(unperturbed_system, perburations)
 
     j1_init = [
         0.25,
@@ -203,7 +235,7 @@ if __name__ == "__main__":
         0.5,
         0.6,
     ]
-    poincare = calculate_poincare_at_given_energy(system, j1_init, E, max_time=100)
+    poincare = calculate_poincare_at_given_energy(system, j1_init, E, max_time=10000)
     fig, ax = plt.subplots()
     J1_cross = poincare[:, 0]
     theta2_cross = poincare[:, 3]
