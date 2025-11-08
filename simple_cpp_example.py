@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from itertools import chain
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -73,7 +72,7 @@ def calculate_poincare_at_given_energy(
 if __name__ == "__main__":
 
     unperturbed_system = UnperturbedSystem(a=3.4)
-    E = 1.50
+    E = 1.75
 
     epsilon = 7e-3
 
@@ -92,7 +91,7 @@ if __name__ == "__main__":
         resonances[rc] = [
             Resonance(J1_res, J2_res, n1, m2)
             for J1_res, J2_res in find_resonances_at_constant_energy(
-                unperturbed_system, rc, E, 0.1, unperturbed_system.maximal_J1(E)
+                unperturbed_system, rc, E, 0.1, 0.999999*unperturbed_system.maximal_J1(E)
             )
         ]
 
@@ -114,7 +113,9 @@ if __name__ == "__main__":
             )
             resonance_islands.append(island)
 
-    resonance_islands = sorted(resonance_islands, key=lambda island: island.resonance.J1)
+    resonance_islands = sorted(
+        resonance_islands, key=lambda island: island.resonance.J1
+    )
 
     sys = qkc.PerturbedSystem(
         a=unperturbed_system.a,
@@ -124,6 +125,7 @@ if __name__ == "__main__":
     )
 
     j1_init = np.linspace(0.1, 0.99999 * unperturbed_system.maximal_J1(E), 40)
+    j1_init = np.append(j1_init, unperturbed_system.J1_critical(E))
     poincare = calculate_poincare_at_given_energy(sys, j1_init, E, max_time=10000)
     fig, ax = plt.subplots(num=f"Poincare section at E={E}, epsilon={epsilon:.2e}")
     J1_cross = poincare[:, 0]
@@ -138,9 +140,17 @@ if __name__ == "__main__":
     ax.set_xticklabels(["-π", "-π/2", "0", "π/2", "π"])
     ax.set_ylabel(r"$J_1$")
     ax.set_xlabel(r"$\theta_2$")
+    ax.set_xlim(-np.pi, np.pi)
 
     for island in resonance_islands:
         ax.axhline(island.resonance.J1, ls="--", color="blue", alpha=0.7)
-        ax.axhspan(*island.J1_domain(), color="red", alpha=0.3)
+        #  ax.axhspan(*island.J1_domain(), color="red", alpha=0.3)
 
+    ax.axhline(
+        unperturbed_system.J1_critical(E),
+        ls="--",
+        color="red",
+        lw=1.5,
+        label="J1 critical",
+    )
     plt.show()
