@@ -59,7 +59,9 @@ class UnperturbedSystem:
 
     def kinetic_q_minimum(self, E):
         """returns the minimum of kinetic_q at given energy E"""
-        return self.kinetic_q(self.J1_critical(E), self.J2_at_constant_energy(self.J1_critical(E), E))
+        return self.kinetic_q(
+            self.J1_critical(E), self.J2_at_constant_energy(self.J1_critical(E), E)
+        )
 
 
 class Perturbation:
@@ -172,21 +174,22 @@ if __name__ == "__main__":
 
     unperturbed_system = UnperturbedSystem(a=3.4)
 
-    E = 1.59
+    E = 1.79
     epsilon = 1e-2
 
-    j1 = np.linspace(0.1, 0.9999 * unperturbed_system.maximal_J1(E), 100)
+    j1 = np.linspace(0.2, 0.96 * unperturbed_system.maximal_J1(E), 100)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(num=f"Kinetic q at E = {E}, alpha = {unperturbed_system.a}")
     ax.plot(j1, unperturbed_system.kinetic_q_at_constant_energy(j1, E))
-    ax.set_xlabel("J1")
-    ax.set_ylabel("q")
-    ax.set_title(f"Kinetic q at E = {E}, alpha = {unperturbed_system.a}")
-    ax.set_ylim(0, 8)
+    ax.set_xlabel(r"$J_1$")
+    ax.set_ylabel(r"$q_\mathrm{kin}$")
+    ax.set_ylim(2.5, 7.5)
     ax.axhline(4, color="black", lw=0.5)
     ax.axhline(5, color="black", lw=0.5)
     ax.axhline(6, color="black", lw=0.5)
-    ax.plot(unperturbed_system.J1_critical(E), unperturbed_system.kinetic_q_minimum(E), "ro")
+    ax.plot(
+        unperturbed_system.J1_critical(E), unperturbed_system.kinetic_q_minimum(E), "ro"
+    )
 
     perburations = [
         Perturbation(epsilon=epsilon, n1=1, m2=-4),
